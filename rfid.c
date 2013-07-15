@@ -277,7 +277,8 @@ void* poll_wiegand(void *arg){
 
 		///RFID data is present, store it.
 		if(reader.readerCount >= 26){
-			reader.rfid=reader.temp;
+			//Mask the MSB off and Shift out the LSB. These are the even and odd parity.
+			reader.rfid=(reader.temp>>1) & 0x00FFFFFF;
 			reader.status = reader.status | 0x01;
 			reader.readerCount=0;
 			reader.temp=0;
