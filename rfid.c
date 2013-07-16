@@ -36,15 +36,15 @@ Lesser General Public License for more details.
 pthread_t tid[1];
 
 struct reader_t {
-	char status;				//This is a bit mask field. 0x01-RFID_READY, 0x02-KEYS_READY, 0x04-AUX_OPTIONS_READY
-	char userVerified; 			//0- Not verified, 1-verified, 2-verified as admin
+	unsigned char status;			//This is a bit mask field. 0x01-RFID_READY, 0x02-KEYS_READY, 0x04-AUX_OPTIONS_READY
+	unsigned char userVerified; 		//0- Not verified, 1-verified, 2-verified as admin
 	unsigned int rfid; 			//RFID key that was read
-	char keys[5]; 				//Key presses stored in this array
-	char keyCount; 				//How many keys have been pressed
-	char readerCount; 			//Wiegand bits read in the packet.
+	unsigned char keys[5];			//Key presses stored in this array
+	unsigned char keyCount; 		//How many keys have been pressed
+	unsigned char readerCount; 		//Wiegand bits read in the packet.
 	unsigned int temp; 			//wiegand buffer
-	char lastPacketType; 		//1 if the last detected action was a keypress. 0 if it thinks its an rfid read
-	struct timeval tvPacket; 	//time since the last wiegand packet was recivied, used to timeout the session for inactivity.
+	unsigned char lastPacketType; 		//1 if the last detected action was a keypress. 0 if it thinks its an rfid read
+	struct timeval tvPacket; 		//time since the last wiegand packet was recivied, used to timeout the session for inactivity.
 };
 
 static struct reader_t reader;
@@ -169,7 +169,6 @@ void* poll_wiegand(void *arg){
 			openlog (RFID_LOG, LOG_AUTH, LOG_NOTICE);
 			syslog (LOG_ERR, "Pin intterupt poll failed, fatal error.");
 			closelog();
-			return -1;
 		}
 
 		gettimeofday(&tvEnd, NULL);
@@ -181,7 +180,7 @@ void* poll_wiegand(void *arg){
 		if(reader.lastPacketType == 1){
 			reader.lastPacketType=0;
 			if(timePacket < MAX_WIEGAND_PACKET_LENGTH_MS){
-				//delete all key presses
+				//delete all key presses this is a rfid token being read.
 				reader.keyCount=0;
 				reader.keys[0]=0;
 				reader.keys[1]=0;
@@ -215,8 +214,11 @@ void* poll_wiegand(void *arg){
 
 		///Key was pressed, add it to the array
 		if(reader.readerCount==WIEGAND_KEY_LENGTH){
-			if(reader.keyCount>5){
+			if(reader.keyCount>6){
 				reader.keyCount=0;
+				reader.status = reader.status & 0b11111001;
+				printf("KEY BUFFER WAS FLUSHED!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+				fflush(stdout);
 			}
 
 			switch(reader.temp){
@@ -276,12 +278,17 @@ void* poll_wiegand(void *arg){
 		}
 
 		///RFID data is present, store it.
-		if(reader.readerCount >= 26){
+		if(reader.readerCount == 26){
 			//Mask the MSB off and Shift out the LSB. These are the even and odd parity.
 			reader.rfid=(reader.temp>>1) & 0x00FFFFFF;
 			reader.status = reader.status | 0x01;
 			reader.readerCount=0;
 			reader.temp=0;
+		}
+
+		if(reader.readerCount > 26){
+			//something went wrong
+			clear_reader();
 		}
 
 #ifdef DEBUG_WIEGAND
@@ -503,7 +510,7 @@ int main(int argc, char **argv, char **envp)
 			//if ESC key was pressed or if admin key was scanned twice.
 			if(reader.keys[0]==10 || reader.keys[1]==10 ||reader.keys[2]==10 ||reader.keys[3]==10 ||reader.keys[4]==10 || reader.rfid == lastKey){
 				openlog (RFID_LOG, LOG_AUTH, LOG_NOTICE);
-				syslog (LOG_INFO, "Delete user mode exited. No user deleted.",reader.rfid);
+				syslog (LOG_INFO, "Delete user mode exited by %d. No user deleted.",reader.rfid);
 				closelog();
 			}
 			else{
