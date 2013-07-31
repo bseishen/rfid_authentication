@@ -482,9 +482,10 @@ int main(int argc, char **argv, char **envp)
 			clear_reader = 1;
 			fflush(stdout);
 		}
-		//Comment out the 2 lines below to add a user for the first time!!
-		//reader.userVerified = 2;
-		//reader.keys[4]=11;
+#ifdef ADD_FIRST_USER
+		reader.userVerified = 2;
+		reader.keys[4]=11;
+#endif
 		//add new user (using ENT key on keypad)
 		if(userVerified == 2 && reader.keys[4]==11){
 			openlog (RFID_LOG, LOG_AUTH, LOG_NOTICE);
@@ -543,8 +544,11 @@ int main(int argc, char **argv, char **envp)
 				sprintf(buffer, "%d", keyBuff);
 				result = crypt(buffer, salt);
 
+#ifdef ADD_FIRST_USER
+				sprintf(query, "INSERT INTO users VALUES('%d','%s','','','%d','%d',1,0,1)" , reader.rfid, result, lastKey, (int)tvNow.tv_sec);
+#else
 				sprintf(query, "INSERT INTO users VALUES('%d','%s','','','%d','%d',0,0,1)" , reader.rfid, result, lastKey, (int)tvNow.tv_sec);
-				//printf(query);
+#endif
 				retval = sqlite3_prepare_v2(handle,query,-1,&stmt,0);
 				retval = sqlite3_step(stmt);
 

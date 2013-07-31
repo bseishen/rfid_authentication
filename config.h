@@ -25,6 +25,9 @@ Lesser General Public License for more details.
 
 #define DB_PATH "/var/www/rfid.sqlite"
 
-
+/*To add the first user to the database, comment the below line out
+ * This will add the first rfid token and 4 digit key press to the database
+ */
+//#define ADD_FIRST_USER
 
 #endif /*_config_h */
