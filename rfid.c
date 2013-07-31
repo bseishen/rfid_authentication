@@ -272,7 +272,7 @@ int main(int argc, char **argv, char **envp)
 
 
 	//init DB
-    retval = sqlite3_open("/var/www/rfid.sqlite",&handle);
+    retval = sqlite3_open(DB_PATH, &handle);
     if(retval)
     {
 		openlog (RFID_LOG, LOG_AUTH, LOG_NOTICE);

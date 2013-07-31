@@ -23,6 +23,8 @@ Lesser General Public License for more details.
 #define STATUS_LED_GPIO    45 //pull to ground for Green, floating$
 #define BUZZER_GPIO        44 //pull to ground to activate buzzer $
 
+#define DB_PATH "/var/www/rfid.sqlite"
+
 
 
 #endif /*_config_h */
