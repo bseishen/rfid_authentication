@@ -233,3 +233,67 @@ int gpio_init(void){
 
 	return 1;
 }
+
+/**
+ * Activates the beeper on the reader.
+ */
+void beep_on(){
+	gpio_set_value(BUZZER_GPIO, 0);
+}
+
+/**
+ * Turns off the beeper on the reader.
+ */
+void beep_off(){
+	gpio_set_value(BUZZER_GPIO, 1);
+}
+
+/**
+ * Activates the led on the reader.
+ */
+void led_on(){
+	gpio_set_value(STATUS_LED_GPIO, 0);
+}
+
+/**
+ * Turns off the led on the reader.
+ */
+void led_off(){
+	gpio_set_value(STATUS_LED_GPIO, 1);
+}
+
+/**
+ * Turns off and on the led on the reader.
+ */
+void led_blink(int times){
+	int i;
+	for(i=0; i<times; i++){
+		led_on();
+		sleep(.5);
+		led_off(.5);
+		sleep(.5);
+	}
+}
+
+/**
+ * Self Explanatory.
+ */
+void unlock_door(){
+	gpio_set_value(DOOR_GPIO, 0);
+}
+
+/**
+ * Self Explanatory.
+ */
+void lock_door(){
+	gpio_set_value(DOOR_GPIO, 1);
+}
+
+/**
+ * Toggles Garage door.
+ */
+void toggle_garage(){
+	gpio_set_value(GARAGE_GPIO, 0);
+	sleep(1);
+	gpio_set_value(GARAGE_GPIO, 1);
+}

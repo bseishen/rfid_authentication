@@ -20,5 +20,13 @@ int gpio_set_edge(unsigned int gpio, char *edge);
 int gpio_fd_open(unsigned int gpio);
 int gpio_fd_close(int fd);
 int gpio_init(void);
+void beep_on(void);
+void beep_off(void);
+void led_on(void);
+void led_off(void);
+void led_blink(int times);
+void unlock_door(void);
+void lock_door(void);
+void toggle_garage(void);
 
 #endif /* gpio.h */

@@ -27,125 +27,51 @@ Lesser General Public License for more details.
 //#define DEBUG_WIEGAND 1
 
 #define MAX_BUF 64
-#define TIMEOUT_MS 5000
+#define TIMEOUT_DOORLOCK 5000
 #define MAX_WIEGAND_PACKET_LENGTH_MS 5
 #define WIEGAND_KEY_LENGTH 8
 #define RFID_LOG "RFID"
+
+#define STATUS_NULL 		0x00
+#define STATUS_RFID_READY	0x01
+#define STATUS_KEYS_READY	0x02
+#define STATUS_AUX_OPTIONS	0x04
 
 
 pthread_t tid[1];
 
 struct reader_t {
-	unsigned char status;			//This is a bit mask field. 0x01-RFID_READY, 0x02-KEYS_READY, 0x04-AUX_OPTIONS_READY
-	unsigned char userVerified; 		//0- Not verified, 1-verified, 2-verified as admin
-	unsigned int rfid; 			//RFID key that was read
-	unsigned char keys[5];			//Key presses stored in this array
-	unsigned char keyCount; 		//How many keys have been pressed
-	unsigned char readerCount; 		//Wiegand bits read in the packet.
-	unsigned int temp; 			//wiegand buffer
-	unsigned char lastPacketType; 		//1 if the last detected action was a keypress. 0 if it thinks its an rfid read
-	struct timeval tvPacket; 		//time since the last wiegand packet was recivied, used to timeout the session for inactivity.
+	unsigned char status;				//This is a bit mask field. 0x01-RFID_READY, 0x02-KEYS_READY, 0x04-AUX_OPTIONS_READY
+	unsigned int  rfid; 				//RFID key that was read
+	unsigned char keys[5];				//Key presses stored in this array
+	struct timeval tvPacket; 			//time since the last wiegand packet was recivied, used to timeout the session for inactivity.
 };
 
-static struct reader_t reader;
+static volatile struct reader_t reader;
 
-/**
- * Nulls the Strut type reader.
- */
-void clear_reader(){
-	reader.status=0;
-	reader.userVerified=0;
-	reader.rfid=0;
-	reader.keys[0]=0;
-	reader.keys[1]=0;
-	reader.keys[2]=0;
-	reader.keys[3]=0;
-	reader.keys[4]=0;
-	reader.keyCount=0;
-	reader.temp=0;
-	reader.readerCount=0;
-	reader.lastPacketType = 0;
-}
+static volatile unsigned char clear_reader = 0;  //bit flag used to tell the wiegand routine to flush any temp data.
 
-/**
- * Activates the beeper on the reader.
- */
-void beep_on(){
-	gpio_set_value(BUZZER_GPIO, 0);
-}
 
-/**
- * Turns off the beeper on the reader.
- */
-void beep_off(){
-	gpio_set_value(BUZZER_GPIO, 1);
-}
-
-/**
- * Activates the led on the reader.
- */
-void led_on(){
-	gpio_set_value(STATUS_LED_GPIO, 0);
-}
-
-/**
- * Turns off the led on the reader.
- */
-void led_off(){
-	gpio_set_value(STATUS_LED_GPIO, 1);
-}
-
-/**
- * Turns off and on the led on the reader.
- */
-void led_blink(int times){
-	int i;
-	for(i=0; i<times; i++){
-		led_on();
-		sleep(.5);
-		led_off(.5);
-		sleep(.5);
-	}
-}
-
-/**
- * Self Explanatory.
- */
-void unlock_door(){
-	gpio_set_value(DOOR_GPIO, 0);
-}
-
-/**
- * Self Explanatory.
- */
-void lock_door(){
-	gpio_set_value(DOOR_GPIO, 1);
-}
-
-/**
- * Toggles Garage door.
- */
-void toggle_garage(){
-	gpio_set_value(GARAGE_GPIO, 0);
-	sleep(1);
-	gpio_set_value(GARAGE_GPIO, 1);
-}
 
 /**
  * Poll_wiegand polls D0 and D1 for data and fills the reader structure.
  */
+
 void* poll_wiegand(void *arg){
 	struct pollfd fdset[2];
 	struct timeval tvEnd, tvDiff;
 	int nfds = 2;
+	int lastPacketType = 0;
+	int keyCount=0;
+	int temp=0;
+	int readerCount=0;
+	int lastPacketType = 0;
 	int gpio_d0, gpio_d1, timePacket, rc;
 	char *buf[MAX_BUF];
 	unsigned char charTemp;
 
 	gpio_d0 = gpio_fd_open(WIEGAND_D0_GPIO);
 	gpio_d1 = gpio_fd_open(WIEGAND_D1_GPIO);
-
-	clear_reader();
  
 	memset((void*)fdset, 0, sizeof(fdset));
 
@@ -155,10 +81,11 @@ void* poll_wiegand(void *arg){
 	fdset[1].fd = gpio_d1;
 	fdset[1].events = POLLPRI;
 
+	//This is needed to flush the first false interupt
 	read(fdset[0].fd, buf, MAX_BUF);
 	read(fdset[1].fd, buf, MAX_BUF);
 
-	fflush(stdout);
+	clear_reader = 1;
 
 	while (1) {
 		gettimeofday(&reader.tvPacket, NULL);
@@ -171,52 +98,62 @@ void* poll_wiegand(void *arg){
 			closelog();
 		}
 
+		if(clear_reader = 1){
+			reader.status = STATUS_NULL;
+			reader.rfid = 0;
+			reader.keys[0] = 0;
+			reader.keys[1] = 0;
+			reader.keys[2] = 0;
+			reader.keys[3] = 0;
+			reader.keys[4] = 0;
+			clear_reader = 0;
+		}
+
 		gettimeofday(&tvEnd, NULL);
 		timersub(&tvEnd, &reader.tvPacket, &tvDiff);
 		timePacket = (tvDiff.tv_sec) * 1000 + (tvDiff.tv_usec) / 1000 ;
 
 		//packet data over the wiegand is either 26bits for rfid read or 8 bits for a keypress.
 		//if time from the last packet is under 5ms, treat the last packet as an rfid packet.
-		if(reader.lastPacketType == 1){
-			reader.lastPacketType=0;
+		if(lastPacketType == 1){
+			lastPacketType = 0;
 			if(timePacket < MAX_WIEGAND_PACKET_LENGTH_MS){
-				//delete all key presses this is a rfid token being read.
-				reader.keyCount=0;
-				reader.keys[0]=0;
-				reader.keys[1]=0;
-				reader.keys[2]=0;
-				reader.keys[3]=0;
-				reader.keys[4]=0;
+				//Delete all key presses. This is a rfid token being read.
+				keyCount = 0;
+				reader.keys[0] = 0;
+				reader.keys[1] = 0;
+				reader.keys[2] = 0;
+				reader.keys[3] = 0;
+				reader.keys[4] = 0;
 			}
 			else{
-				//last packet was a key press
-				reader.temp=0;
-				reader.readerCount=0;
-				reader.lastPacketType=0;
+				//Last packet was a key press.
+				temp = 0;
+				readerCount = 0;
+				lastPacketType = 0;
 			}
 		}
 
 
 		if (fdset[0].revents & POLLPRI) {
 			read(fdset[0].fd, buf, MAX_BUF);
-			reader.temp = reader.temp << 1;
-			reader.readerCount++;
-
+			temp = reader.temp << 1;
+			readerCount++;
 		}
 
 		if (fdset[1].revents & POLLPRI) {
 			read(fdset[1].fd, buf, MAX_BUF);
-			reader.temp = reader.temp << 1;
-			reader.temp |= 1;
-			reader.readerCount++;
+			temp = reader.temp << 1;
+			temp |= 1;
+			readerCount++;
 		}
 
 
 		///Key was pressed, add it to the array
 		if(reader.readerCount==WIEGAND_KEY_LENGTH){
-			if(reader.keyCount>6){
-				reader.keyCount=0;
-				reader.status = reader.status & 0b11111001;
+			if(keyCount>6){
+				keyCount=0;
+				reader.status  &= ~(STATUS_KEYS_READY|STATUS_AUX_OPTIONS);
 				printf("KEY BUFFER WAS FLUSHED!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
 				fflush(stdout);
 			}
@@ -263,32 +200,32 @@ void* poll_wiegand(void *arg){
 			}
 
 			if(charTemp!=0xFF){
-				reader.keys[reader.keyCount] = charTemp;
+				reader.keys[keyCount] = charTemp;
 				//set status bit for keyRead is ready
-				if(reader.keyCount == 3){
-					reader.status = reader.status | 0x02;
+				if(keyCount == 3){
+					reader.status |= STATUS_KEYS_READY;
 				}
-				if(reader.keyCount == 4){
-					reader.status = reader.status | 0x04;
+				if(keyCount == 4){
+					reader.status |= STATUS_AUX_OPTIONS;
 				}
 			}
 
-			reader.keyCount++;
-			reader.lastPacketType = 1;
+			keyCount++;
+			lastPacketType = 1;
 		}
 
 		///RFID data is present, store it.
-		if(reader.readerCount == 26){
+		if(readerCount == 26){
 			//Mask the MSB off and Shift out the LSB. These are the even and odd parity.
 			reader.rfid=(reader.temp>>1) & 0x00FFFFFF;
-			reader.status = reader.status | 0x01;
-			reader.readerCount=0;
-			reader.temp=0;
+			reader.status |= STATUS_RFID_READY;
+			readerCount = 0;
+			temp = 0;
 		}
 
 		if(reader.readerCount > 26){
 			//something went wrong
-			clear_reader();
+			clear_reader = 1;
 		}
 
 #ifdef DEBUG_WIEGAND
@@ -317,6 +254,7 @@ int main(int argc, char **argv, char **envp)
 {
 
 	int retval;
+	unsigned char userVerified = 0; 			//0- Not verified, 1-verified, 2-verified as admin
 	unsigned int lastKey;
 	char *result;
 	char buffer[20];
@@ -324,7 +262,7 @@ int main(int argc, char **argv, char **envp)
 	char query[200];
 	sqlite3_stmt *stmt;
 	sqlite3 *handle;
-	struct timeval tvNow, tvDifference;
+	struct timeval tvNow, tvDifference, tvAux;
 	int timeMS;
 	int keyBuff;
 
@@ -366,17 +304,17 @@ int main(int argc, char **argv, char **envp)
 		timeMS = (tvDifference.tv_sec) * 1000 + (tvDifference.tv_usec) / 1000 ;
 
 		///Clear if timeout has exceeded threshold. Lock everything!
-		if(timeMS>TIMEOUT_MS){
-			clear_reader();
+		if(timeMS>TIMEOUT_DOORLOCK){
+			userVerified = 0;
+			clear_reader = 1;
 			lock_door();
 			led_off();
 			beep_off();
-			gettimeofday(&reader.tvPacket, NULL);
 		}
 
 
 		//Authenticate User
-		if(reader.userVerified == 0 && (reader.status == 3 || reader.status == 7)){
+		if(userVerified == 0 && (reader.status == STATUS_KEYS_READY || reader.status == (STATUS_KEYS_READY|STATUS_AUX_OPTIONS))){
 			keyBuff = (reader.keys[0]*1000)+(reader.keys[1]*100)+(reader.keys[2]*10)+reader.keys[3];
 			sprintf(query, "SELECT * from users WHERE key='%d'" , reader.rfid);
 			retval = sqlite3_prepare_v2(handle,query,-1,&stmt,0);
@@ -431,10 +369,10 @@ int main(int argc, char **argv, char **envp)
 				        	if(strcmp(hash,result)==0){
 				        		//Check if user is active.
 				        		if(sqlite3_column_int(stmt,8)){
-				        			reader.userVerified = 1;
+				        			userVerified= 1;
 				        			//Check if user is an admin.
 				        			if(sqlite3_column_int(stmt,6)){
-				        				reader.userVerified = 2;
+				        				userVerified = 2;
 				        			}
 				        		}
 				        	}
@@ -454,7 +392,7 @@ int main(int argc, char **argv, char **envp)
 				}
 
 
-				if(reader.userVerified > 0){
+				if(userVerified > 0){
 					openlog (RFID_LOG, LOG_AUTH, LOG_NOTICE);
 					syslog (LOG_NOTICE, "Access granted to user %d", reader.rfid);
 					closelog();
@@ -484,27 +422,39 @@ int main(int argc, char **argv, char **envp)
 					openlog (RFID_LOG, LOG_AUTH, LOG_NOTICE);
 					syslog (LOG_NOTICE, "Access denied to user %d", reader.rfid);
 					closelog();
-					clear_reader();
+					clear_reader = 1;
 					led_blink(2);
 				}
 			}
 		}
 
 		//delete user (using ESC key on keypad)
-		if(reader.userVerified == 2 && reader.keys[4]==10){
+		if(userVerified == 2 && reader.keys[4]==10){
 			openlog (RFID_LOG, LOG_AUTH, LOG_NOTICE);
 			syslog (LOG_INFO, "Delete user mode entered by user ID:%d",reader.rfid);
 			closelog();
-			clear_reader();
+			clear_reader = 1;
 			beep_on();
 			sleep(1);
 			beep_off();
 
 			//Wait for rfid to be scanned. Cancels if ESC key is pressed.
-			while(reader.status!=1){
-				if(reader.keys[0]==10 || reader.keys[1]==10 ||reader.keys[2]==10 ||reader.keys[3]==10 ||reader.keys[4]==10)
+			while(reader.status!=STATUS_RFID_READY){
+				if(reader.keys[0]==10 || reader.keys[1]==10 ||reader.keys[2]==10 ||reader.keys[3]==10 ||reader.keys[4]==10){
+					retval = 1;
 					break;
+				}
+
+				gettimeofday(&tvAux, NULL);
+				timersub(&tvAux, &tvNow, &tvDifference);
+				timeMS = (tvDifference.tv_sec) * 1000 + (tvDifference.tv_usec) / 1000 ;
+				if(timeMS > 20000){
+					retval = 1;
+					break;
+				}
+
 				sleep(.1);
+
 			}
 
 			//if ESC key was pressed or if admin key was scanned twice.
@@ -529,34 +479,45 @@ int main(int argc, char **argv, char **envp)
 				beep_off();
 			}
 
-			clear_reader();
+			clear_reader = 1;
 			fflush(stdout);
 		}
 		//Comment out the 2 lines below to add a user for the first time!!
 		//reader.userVerified = 2;
 		//reader.keys[4]=11;
 		//add new user (using ENT key on keypad)
-		if(reader.userVerified == 2 && reader.keys[4]==11){
+		if(userVerified == 2 && reader.keys[4]==11){
 			openlog (RFID_LOG, LOG_AUTH, LOG_NOTICE);
 			syslog (LOG_INFO, "Add user mode entered by user %d",reader.rfid);
 			closelog();
 
-			clear_reader();
+			clear_reader = 1;
 			beep_on();
 			sleep(1);
 			beep_off();
 
-
-			//Wait for rfid and keys to be pressed for the new user. Cancels if ESC key is pressed.
-			while(reader.status!=3){
-				if(reader.keys[0]==10 || reader.keys[1]==10 ||reader.keys[2]==10 ||reader.keys[3]==10 ||reader.keys[4]==10)
+			retval = 0;
+			//Wait for rfid and keys to be pressed for the new user. Cancels if ESC key is pressed or takes longer than 20sec.
+			while(reader.status!=(STATUS_RFID_READY|STATUS_KEYS_READY)){
+				if(reader.keys[0]==10 || reader.keys[1]==10 ||reader.keys[2]==10 ||reader.keys[3]==10 ||reader.keys[4]==10){
+					retval = 1;
 					break;
+				}
+
+				gettimeofday(&tvAux, NULL);
+				timersub(&tvAux, &tvNow, &tvDifference);
+				timeMS = (tvDifference.tv_sec) * 1000 + (tvDifference.tv_usec) / 1000 ;
+				if(timeMS > 20000){
+					retval = 1;
+					break;
+				}
+
 				sleep(.1);
 
 			}
 
 			//if ESC key was pressed
-			if(reader.keys[0]==10 || reader.keys[1]==10 ||reader.keys[2]==10 ||reader.keys[3]==10 ||reader.keys[4]==10){
+			if(retval){
 				openlog (RFID_LOG, LOG_AUTH, LOG_NOTICE);
 				syslog (LOG_INFO, "Add user mode exited, no users were added.");
 				closelog();
@@ -598,15 +559,15 @@ int main(int argc, char **argv, char **envp)
 				beep_off();
 
 			}
-			clear_reader();
+			clear_reader = 1;
 		}
 
 		//OpenGarageDoor (using number 2 on keypad)
-		if(reader.userVerified > 0 && reader.keys[4]==2){
+		if(userVerified > 0 && reader.keys[4]==2){
 			openlog (RFID_LOG, LOG_AUTH, LOG_NOTICE);
 			syslog (LOG_INFO, "Garage door toggled by user %d", reader.rfid);
 			closelog();
-			clear_reader();
+			clear_reader = 1;
 			toggle_garage();
 		}
 
