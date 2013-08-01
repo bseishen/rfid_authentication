@@ -59,7 +59,6 @@ void* poll_wiegand(void *arg){
 	int keyCount=0;
 	int temp=0;
 	int readerCount=0;
-	int lastPacketType = 0;
 	int gpio_d0, gpio_d1, timePacket, rc;
 	char *buf[MAX_BUF];
 	unsigned char charTemp;
