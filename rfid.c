@@ -86,9 +86,7 @@ void* poll_wiegand(void *arg){
 		rc = poll(fdset, nfds, -1);
 
 		if (rc < 0) {
-			openlog (RFID_LOG, LOG_AUTH, LOG_NOTICE);
-			syslog (LOG_ERR, "Pin intterupt poll failed, fatal error.");
-			closelog();
+			log("LOG_ERR","Pin intterupt poll failed, fatal error.");
 		}
 
 		if(clear_reader = 1){
