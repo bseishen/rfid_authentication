@@ -131,20 +131,20 @@ void* poll_wiegand(void *arg){
 
 		if (fdset[0].revents & POLLPRI) {
 			read(fdset[0].fd, buf, MAX_BUF);
-			temp = reader.temp << 1;
+			temp = temp << 1;
 			readerCount++;
 		}
 
 		if (fdset[1].revents & POLLPRI) {
 			read(fdset[1].fd, buf, MAX_BUF);
-			temp = reader.temp << 1;
+			temp = temp << 1;
 			temp |= 1;
 			readerCount++;
 		}
 
 
 		///Key was pressed, add it to the array
-		if(reader.readerCount==WIEGAND_KEY_LENGTH){
+		if(readerCount==WIEGAND_KEY_LENGTH){
 			if(keyCount>6){
 				keyCount=0;
 				reader.status  &= ~(STATUS_KEYS_READY|STATUS_AUX_OPTIONS);
@@ -152,7 +152,7 @@ void* poll_wiegand(void *arg){
 				fflush(stdout);
 			}
 
-			switch(reader.temp){
+			switch(temp){
 				case 0xE1:
 					charTemp = 1;
 					break;
@@ -211,20 +211,20 @@ void* poll_wiegand(void *arg){
 		///RFID data is present, store it.
 		if(readerCount == 26){
 			//Mask the MSB off and Shift out the LSB. These are the even and odd parity.
-			reader.rfid=(reader.temp>>1) & 0x00FFFFFF;
+			reader.rfid=(temp>>1) & 0x00FFFFFF;
 			reader.status |= STATUS_RFID_READY;
 			readerCount = 0;
 			temp = 0;
 		}
 
-		if(reader.readerCount > 26){
+		if(readerCount > 26){
 			//something went wrong
 			clear_reader = 1;
 		}
 
 #ifdef DEBUG_WIEGAND
 		printf("RFID: %X \n", reader.rfid);
-		printf("KEYCOUNT: %X \n", reader.keyCount);
+		printf("KEYCOUNT: %X \n", keyCount);
 		printf("KEY1: %X \n", reader.keys[0]);
 		printf("KEY2: %X \n", reader.keys[1]);
 		printf("KEY3: %X \n", reader.keys[2]);
@@ -392,7 +392,7 @@ int main(int argc, char **argv, char **envp)
 					closelog();
 					//clear temp buffer and grab last rfid key
 					lastKey=reader.rfid;
-					reader.temp=0;
+					//Possibly need to clear reader temp
 
 					//Update User's last login time
 					sprintf(query, "UPDATE users SET lastLogin='%d' WHERE key='%d'" ,(int)tvNow.tv_sec, reader.rfid);
