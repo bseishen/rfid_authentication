@@ -270,7 +270,7 @@ void led_blink(int times){
 	for(i=0; i<times; i++){
 		led_on();
 		sleep(.5);
-		led_off(.5);
+		led_off();
 		sleep(.5);
 	}
 }
