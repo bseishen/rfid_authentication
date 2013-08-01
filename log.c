@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <syslog.h>
 
 void log(const char* tag, const char* message) {
    time_t now;
