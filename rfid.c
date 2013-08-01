@@ -26,12 +26,6 @@ Lesser General Public License for more details.
 
 //#define DEBUG_WIEGAND 1
 
-#define MAX_BUF 64
-#define TIMEOUT_DOORLOCK 5000
-#define MAX_WIEGAND_PACKET_LENGTH_MS 5
-#define WIEGAND_KEY_LENGTH 8
-#define RFID_LOG "RFID"
-
 #define STATUS_NULL 		0x00
 #define STATUS_RFID_READY	0x01
 #define STATUS_KEYS_READY	0x02

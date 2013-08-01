@@ -31,4 +31,12 @@ Lesser General Public License for more details.
  */
 //#define ADD_FIRST_USER
 
+
+//Only edit below if you know what your doing
+#define MAX_BUF 64
+#define TIMEOUT_DOORLOCK 5000
+#define MAX_WIEGAND_PACKET_LENGTH_MS 5
+#define WIEGAND_KEY_LENGTH 8
+#define RFID_LOG "RFID"
+
 #endif /*_config_h */
