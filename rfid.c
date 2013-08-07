@@ -277,9 +277,6 @@ int main(int argc, char **argv, char **envp)
 	//init ports
 	gpio_init();
 
-	sprintf(error,"Test 123");
-	log_err(error);
-
 	//init DB
     retval = sqlite3_open(DB_PATH, &handle);
     if(retval)
