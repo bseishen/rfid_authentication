@@ -117,7 +117,7 @@ void* poll_wiegand(void *arg){
 				readerCount = 0;
 				//If an esc key was pressed, clear reader.
 				if(reader.keys[0] == 10 || reader.keys[1] == 10 || reader.keys[2] == 10 || reader.keys[3] == 10){
-					clear_reader == 1;
+					clear_reader = 1;
 				}
 			}
 		}
