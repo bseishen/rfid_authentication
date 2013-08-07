@@ -24,7 +24,7 @@ Lesser General Public License for more details.
 #include "config.h"
 #include "gpio.h"
 
-//#define DEBUG_WIEGAND 1
+#define DEBUG_WIEGAND 1
 
 #define STATUS_NULL 		0x00
 #define STATUS_RFID_READY	0x01
@@ -41,9 +41,9 @@ struct reader_t {
 	struct timeval tvPacket; 			//time since the last wiegand packet was recivied, used to timeout the session for inactivity.
 };
 
-static volatile struct reader_t reader;
+struct reader_t reader;
 
-static volatile unsigned char clear_reader = 0;  //bit flag used to tell the wiegand routine to flush any temp data.
+unsigned char clear_reader = 0;  //bit flag used to tell the wiegand routine to flush any temp data.
 
 
 
@@ -89,7 +89,7 @@ void* poll_wiegand(void *arg){
 			//log("LOG_ERR","Pin intterupt poll failed, fatal error.");
 		}
 
-		if(clear_reader = 1){
+		if(clear_reader == 1){
 			reader.status = STATUS_NULL;
 			reader.rfid = 0;
 			reader.keys[0] = 0;
@@ -97,6 +97,10 @@ void* poll_wiegand(void *arg){
 			reader.keys[2] = 0;
 			reader.keys[3] = 0;
 			reader.keys[4] = 0;
+			temp = 0;
+			readerCount = 0;
+			lastPacketType = 0;
+			keyCount = 0;
 			clear_reader = 0;
 		}
 
@@ -121,7 +125,6 @@ void* poll_wiegand(void *arg){
 				//Last packet was a key press.
 				temp = 0;
 				readerCount = 0;
-				lastPacketType = 0;
 			}
 		}
 
@@ -195,9 +198,11 @@ void* poll_wiegand(void *arg){
 				//set status bit for keyRead is ready
 				if(keyCount == 3){
 					reader.status |= STATUS_KEYS_READY;
+					printf("key status to ready capt'n \n");
 				}
 				if(keyCount == 4){
 					reader.status |= STATUS_AUX_OPTIONS;
+					printf("5th key ready!!\n");
 				}
 			}
 
@@ -294,6 +299,8 @@ int main(int argc, char **argv, char **envp)
 		timersub(&tvNow, &reader.tvPacket, &tvDifference);
 		timeMS = (tvDifference.tv_sec) * 1000 + (tvDifference.tv_usec) / 1000 ;
 
+		printf("Timer: %d",timeMS);
+
 		///Clear if timeout has exceeded threshold. Lock everything!
 		if(timeMS>TIMEOUT_DOORLOCK){
 			userVerified = 0;
@@ -301,11 +308,12 @@ int main(int argc, char **argv, char **envp)
 			lock_door();
 			led_off();
 			beep_off();
+			printf("DOOR LOCKING!!!!!!!!!!!!!!\n");
 		}
 
-
+		//printf("READER STATUS: %d",reader.status);
 		//Authenticate User
-		if(userVerified == 0 && (reader.status == STATUS_KEYS_READY || reader.status == (STATUS_KEYS_READY|STATUS_AUX_OPTIONS))){
+		if(userVerified == 0 && clear_reader == 0 &&(reader.status == (STATUS_RFID_READY|STATUS_KEYS_READY) || reader.status == (STATUS_RFID_READY|STATUS_KEYS_READY|STATUS_AUX_OPTIONS))){
 			keyBuff = (reader.keys[0]*1000)+(reader.keys[1]*100)+(reader.keys[2]*10)+reader.keys[3];
 			sprintf(query, "SELECT * from users WHERE key='%d'" , reader.rfid);
 			retval = sqlite3_prepare_v2(handle,query,-1,&stmt,0);
