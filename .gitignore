@@ -1,0 +1,7 @@
+.project
+gpio_test/
+log.o
+output.txt
+rfid
+rfid.o
+gpio.o
