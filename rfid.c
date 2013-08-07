@@ -26,6 +26,7 @@ Lesser General Public License for more details.
 #include "sqlite3.h"
 
 #define DEBUG_WIEGAND 1
+#define DEBUG	1
 
 #define STATUS_NULL 		0x00
 #define STATUS_RFID_READY	0x01
@@ -76,7 +77,7 @@ void* poll_wiegand(void *arg){
 	fdset[1].fd = gpio_d1;
 	fdset[1].events = POLLPRI;
 
-	//This is needed to flush the first false interupt
+	//This is needed to flush the first false interrupt
 	read(fdset[0].fd, buf, MAX_BUF);
 	read(fdset[1].fd, buf, MAX_BUF);
 
@@ -111,7 +112,7 @@ void* poll_wiegand(void *arg){
 		timersub(&tvEnd, &reader.tvPacket, &tvDiff);
 		timePacket = (tvDiff.tv_sec) * 1000 + (tvDiff.tv_usec) / 1000 ;
 
-		//packet data over the wiegand is either 26bits for rfid read or 8 bits for a keypress.
+		//packet data over the wiegand is either 26bits for rfid read or 8 bits for a key press.
 		//if time from the last packet is under 5ms, treat the last packet as an rfid packet.
 		if(lastPacketType == 1){
 			lastPacketType = 0;
@@ -151,7 +152,9 @@ void* poll_wiegand(void *arg){
 			if(keyCount>5){
 				keyCount=0;
 				reader.status  &= ~(STATUS_KEYS_READY|STATUS_AUX_OPTIONS);
-				printf("KEY BUFFER WAS FLUSHED!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+#ifdef DEBUG
+				printf("KEY PRESSES EXCEEDED 5 PRESSES, FLUSHING KEY BUFFER\n");
+#endif
 				fflush(stdout);
 			}
 
@@ -201,11 +204,15 @@ void* poll_wiegand(void *arg){
 				//set status bit for keyRead is ready
 				if(keyCount == 3){
 					reader.status |= STATUS_KEYS_READY;
-					printf("key status to ready capt'n \n");
+#ifdef DEBUG
+					printf("4 Keys in Buffer \n");
+#endif
 				}
 				if(keyCount == 4){
 					reader.status |= STATUS_AUX_OPTIONS;
-					printf("5th key ready!!\n");
+#ifdef DEBUG
+					printf("5 Keys in Buffer \n");
+#endif
 				}
 			}
 
@@ -259,6 +266,7 @@ int main(int argc, char **argv, char **envp)
 	char buffer[20];
 	char hash[40] = "$1$DeaDBeeF$NanaNanaBooBoo//DooDoo";
 	char query[200];
+	char error[255];
 	sqlite3_stmt *stmt;
 	sqlite3 *handle;
 	struct timeval tvNow, tvDifference, tvAux;
@@ -269,14 +277,15 @@ int main(int argc, char **argv, char **envp)
 	//init ports
 	gpio_init();
 
+	sprintf(error,"Test 123");
+	log_err(error);
 
 	//init DB
     retval = sqlite3_open(DB_PATH, &handle);
     if(retval)
     {
-		openlog (RFID_LOG, LOG_AUTH, LOG_NOTICE);
-		syslog (LOG_ERR, "Sqlite DB failed to INIT!");
-		closelog();
+		sprintf(error,"Sqlite DB failed to INIT!");
+		log_err(error);
         return -1;
     }
 
@@ -286,9 +295,8 @@ int main(int argc, char **argv, char **envp)
 
     //Thread off wiegand poller
 	if (pthread_create(&(tid[1]), NULL, &poll_wiegand, NULL)){
-		openlog (RFID_LOG, LOG_AUTH, LOG_NOTICE);
-		syslog (LOG_ERR, "Wiegand thread failed to start.");
-		closelog();
+		sprintf(error,"Wiegand thread failed to start.");
+		log_err(error);
 	}
 
 
@@ -301,9 +309,9 @@ int main(int argc, char **argv, char **envp)
 		gettimeofday(&tvNow, NULL);
 		timersub(&tvNow, &reader.tvPacket, &tvDifference);
 		timeMS = (tvDifference.tv_sec) * 1000 + (tvDifference.tv_usec) / 1000 ;
-
+#ifdef DEBUG
 		printf("Timer: %d",timeMS);
-
+#endif
 		///Clear if timeout has exceeded threshold. Lock everything!
 		if(timeMS>TIMEOUT_DOORLOCK){
 			userVerified = 0;
@@ -313,17 +321,17 @@ int main(int argc, char **argv, char **envp)
 			beep_off();
 			printf("DOOR LOCKING!!!!!!!!!!!!!!\n");
 		}
-
-		//printf("READER STATUS: %d",reader.status);
+#ifdef DEBUG
+		//printf("READER STATUS: %d \n",reader.status);
+#endif
 		//Authenticate User
 		if(userVerified == 0 && clear_reader == 0 &&(reader.status == (STATUS_RFID_READY|STATUS_KEYS_READY) || reader.status == (STATUS_RFID_READY|STATUS_KEYS_READY|STATUS_AUX_OPTIONS))){
 			keyBuff = (reader.keys[0]*1000)+(reader.keys[1]*100)+(reader.keys[2]*10)+reader.keys[3];
 			sprintf(query, "SELECT * from users WHERE key='%d'" , reader.rfid);
 			retval = sqlite3_prepare_v2(handle,query,-1,&stmt,0);
 			if(retval){
-				openlog (RFID_LOG, LOG_AUTH, LOG_NOTICE);
-				syslog (LOG_NOTICE, "Query returned and error.");
-				closelog();
+				sprintf(error,"Query returned and error.");
+				log_err(error);
 			}
 			else{
 
@@ -344,21 +352,18 @@ int main(int argc, char **argv, char **envp)
 				        else
 				        {
 				            // Some error encountered
-							openlog (RFID_LOG, LOG_AUTH, LOG_NOTICE);
-							syslog (LOG_ERR, "SQLite shit the bed.");
-							closelog();
+							sprintf(error,"SQLite shit the bed.");
+							log_err(error);
 				        }
 				    }
 
 				sprintf(buffer, "%d", keyBuff);
 				result = crypt(buffer, hash);
 				sprintf(query, "SELECT * from users WHERE key='%d'" , reader.rfid);
-				//printf(query);
 				retval = sqlite3_exec(handle,query,0,0,0);
 				if(retval){
-					openlog (RFID_LOG, LOG_AUTH, LOG_NOTICE);
-					syslog (LOG_NOTICE, "Query returned and error.");
-					closelog();
+					sprintf(error,"Query returned and error.");
+					log_err(error);
 				}
 				else{
 					while(1){
@@ -385,9 +390,8 @@ int main(int argc, char **argv, char **envp)
 						}
 						else{
 							// Some error encountered
-							openlog (RFID_LOG, LOG_AUTH, LOG_NOTICE);
-							syslog (LOG_ERR, "SQLite shit the bed.");
-							closelog();
+							sprintf(error,"SQLite shit the bed.");
+							log_err(error);
 							return -1;
 						}
 					}
@@ -395,9 +399,8 @@ int main(int argc, char **argv, char **envp)
 
 
 				if(userVerified > 0){
-					openlog (RFID_LOG, LOG_AUTH, LOG_NOTICE);
-					syslog (LOG_NOTICE, "Access granted to user %d", reader.rfid);
-					closelog();
+					sprintf(error,"Access granted to user %d", reader.rfid);
+					log_err(error);
 					//clear temp buffer and grab last rfid key
 					lastKey=reader.rfid;
 					//Possibly need to clear reader temp
@@ -406,9 +409,8 @@ int main(int argc, char **argv, char **envp)
 					sprintf(query, "UPDATE users SET lastLogin='%d' WHERE key='%d'" ,(int)tvNow.tv_sec, reader.rfid);
 					retval = sqlite3_prepare_v2(handle,query,-1,&stmt,0);
 					if(retval){
-						openlog (RFID_LOG, LOG_AUTH, LOG_NOTICE);
-						syslog (LOG_NOTICE, "Query returned and error.");
-						closelog();
+						sprintf(error,"Query returned and error.");
+						log_err(error);
 					}
 
 					retval = sqlite3_step(stmt);
@@ -421,9 +423,8 @@ int main(int argc, char **argv, char **envp)
 
 				}
 				else{
-					openlog (RFID_LOG, LOG_AUTH, LOG_NOTICE);
-					syslog (LOG_NOTICE, "Access denied to user %d", reader.rfid);
-					closelog();
+					sprintf(error,"ACCESS DENIED to user %d", reader.rfid);
+					log_err(error);
 					clear_reader = 1;
 					led_blink(2);
 				}
@@ -432,9 +433,9 @@ int main(int argc, char **argv, char **envp)
 
 		//delete user (using ESC key on keypad)
 		if(userVerified == 2 && reader.keys[4]==10){
-			openlog (RFID_LOG, LOG_AUTH, LOG_NOTICE);
-			syslog (LOG_INFO, "Delete user mode entered by user ID:%d",reader.rfid);
-			closelog();
+			lastKey = reader.rfid;
+			sprintf(error,"Delete user mode entered by user ID: %d", reader.rfid);
+			log_err(error);
 			clear_reader = 1;
 			beep_on();
 			sleep(1);
@@ -460,10 +461,9 @@ int main(int argc, char **argv, char **envp)
 			}
 
 			//if ESC key was pressed or if admin key was scanned twice.
-			if(reader.keys[0]==10 || reader.keys[1]==10 ||reader.keys[2]==10 ||reader.keys[3]==10 ||reader.keys[4]==10 || reader.rfid == lastKey){
-				openlog (RFID_LOG, LOG_AUTH, LOG_NOTICE);
-				syslog (LOG_INFO, "Delete user mode exited by %d. No user deleted.",reader.rfid);
-				closelog();
+			if(retval || reader.rfid == lastKey){
+				sprintf(error,"Delete user mode exited by %d. No user deleted.",reader.rfid);
+				log_err(error);
 			}
 			else{
 				sprintf(query, "DELETE FROM users WHERE key='%d'" , reader.rfid, hash);
@@ -471,9 +471,8 @@ int main(int argc, char **argv, char **envp)
 				retval = sqlite3_step(stmt);
 
 				if(retval == SQLITE_DONE){
-					openlog (RFID_LOG, LOG_AUTH, LOG_NOTICE);
-					syslog (LOG_INFO, "User %d deleted from DB by User %d",reader.rfid, lastKey);
-					closelog();
+					sprintf(error,"User %d deleted from DB by User %d",reader.rfid, lastKey);
+					log_err(error);
 				}
 
 				beep_on();
@@ -490,9 +489,10 @@ int main(int argc, char **argv, char **envp)
 #endif
 		//add new user (using ENT key on keypad)
 		if(userVerified == 2 && reader.keys[4]==11){
-			openlog (RFID_LOG, LOG_AUTH, LOG_NOTICE);
-			syslog (LOG_INFO, "Add user mode entered by user %d",reader.rfid);
-			closelog();
+			lastKey = reader.rfid;
+
+			sprintf(error,"Add user mode entered by user %d",reader.rfid);
+			log_err(error);
 
 			clear_reader = 1;
 			beep_on();
@@ -520,10 +520,9 @@ int main(int argc, char **argv, char **envp)
 			}
 
 			//if ESC key was pressed
-			if(retval){
-				openlog (RFID_LOG, LOG_AUTH, LOG_NOTICE);
-				syslog (LOG_INFO, "Add user mode exited, no users were added.");
-				closelog();
+			if(retval || reader.rfid == lastKey){
+				sprintf(error,"Add user mode exited, no users were added.");
+				log_err(error);
 			}
 			else{
 				unsigned long seed[2];
@@ -555,9 +554,8 @@ int main(int argc, char **argv, char **envp)
 				retval = sqlite3_step(stmt);
 
 				if(retval == SQLITE_DONE){
-					openlog (RFID_LOG, LOG_AUTH, LOG_NOTICE);
-					syslog (LOG_INFO, "User %d was added to the DB by user %d", reader.rfid, lastKey);
-					closelog();
+					sprintf(error,"User %d was added to the DB by user %d", reader.rfid, lastKey);
+					log_err(error);
 				}
 
 				beep_on();
@@ -570,9 +568,8 @@ int main(int argc, char **argv, char **envp)
 
 		//OpenGarageDoor (using number 2 on keypad)
 		if(userVerified > 0 && reader.keys[4]==2){
-			openlog (RFID_LOG, LOG_AUTH, LOG_NOTICE);
-			syslog (LOG_INFO, "Garage door toggled by user %d", reader.rfid);
-			closelog();
+			sprintf(error,"Garage door toggled by user %d", reader.rfid);
+			log_err(error);
 			clear_reader = 1;
 			toggle_garage();
 		}
