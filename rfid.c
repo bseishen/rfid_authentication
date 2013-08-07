@@ -87,7 +87,7 @@ void* poll_wiegand(void *arg){
 		rc = poll(fdset, nfds, -1);
 
 		if (rc < 0) {
-			sprintf(error,"Pin interrupt poll failed, fatal error.")
+			sprintf(error,"Pin interrupt poll failed, fatal error.");
 			log_err(error);
 		}
 
