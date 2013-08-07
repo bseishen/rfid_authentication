@@ -137,6 +137,12 @@ void* poll_wiegand(void *arg){
 			clear_reader = 0;
 		}
 
+		//this has been added to flush wiegand trash that shows up from EMI from the door latch.
+		if(clear_reader == 2){
+			temp = 0;
+			readerCount = 0;
+		}
+
 
 		if (fdset[0].revents & POLLPRI) {
 			read(fdset[0].fd, buf, MAX_BUF);
@@ -429,6 +435,8 @@ int main(int argc, char **argv, char **envp)
 					gettimeofday(&tvUnlock, NULL);
 
 					unlock_door();
+					usleep(500);
+					clear_reader = 2;
 					//led_on();
 
 					//TODO:log user in logs, notify irc, play welcome message.
