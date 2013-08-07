@@ -20,6 +20,7 @@ Lesser General Public License for more details.
 #include <poll.h>
 #include <pthread.h>
 #include <sys/time.h>
+#include <crypt.h>
 #include "config.h"
 #include "gpio.h"
 #include "log.h"
