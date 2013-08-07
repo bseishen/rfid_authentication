@@ -19,10 +19,11 @@ Lesser General Public License for more details.
 #include <fcntl.h>
 #include <poll.h>
 #include <pthread.h>
-#include "sqlite3.h"
 #include <sys/time.h>
 #include "config.h"
 #include "gpio.h"
+#include "log.h"
+#include "sqlite3.h"
 
 #define DEBUG_WIEGAND 1
 
