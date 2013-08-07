@@ -12,6 +12,6 @@ void log_err(const char* message) {
    fclose(fp);
 
    openlog (RFID_LOG, LOG_AUTH, LOG_NOTICE);
-   syslog (LOG_NOTICE, message);
+   syslog (LOG_NOTICE,"%s", message);
    closelog();
 }
