@@ -463,7 +463,7 @@ int main(int argc, char **argv, char **envp)
 			beep_off();
 
 			//Wait for rfid to be scanned. Cancels if ESC key is pressed.
-			while(reader.status!=STATUS_RFID_READY){
+			while(reader.status!= (STATUS_RFID_READY|STATUS_KEYS_READY)){
 				if(reader.keys[0]==10 || reader.keys[1]==10 ||reader.keys[2]==10 ||reader.keys[3]==10 ||reader.keys[4]==10){
 					retval = 1;
 					break;
