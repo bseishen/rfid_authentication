@@ -61,6 +61,7 @@ void* poll_wiegand(void *arg){
 	int readerCount=0;
 	int gpio_d0, gpio_d1, timePacket, rc;
 	char *buf[MAX_BUF];
+	char *error[255];
 	unsigned char charTemp;
 
 	gpio_d0 = gpio_fd_open(WIEGAND_D0_GPIO);
@@ -86,6 +87,7 @@ void* poll_wiegand(void *arg){
 		rc = poll(fdset, nfds, -1);
 
 		if (rc < 0) {
+
 			//log("LOG_ERR","Pin intterupt poll failed, fatal error.");
 		}
 
@@ -145,7 +147,7 @@ void* poll_wiegand(void *arg){
 
 		///Key was pressed, add it to the array
 		if(readerCount==WIEGAND_KEY_LENGTH){
-			if(keyCount>6){
+			if(keyCount>5){
 				keyCount=0;
 				reader.status  &= ~(STATUS_KEYS_READY|STATUS_AUX_OPTIONS);
 				printf("KEY BUFFER WAS FLUSHED!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");

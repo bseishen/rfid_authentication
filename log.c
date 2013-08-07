@@ -4,7 +4,7 @@
 #include <time.h>
 #include <syslog.h>
 
-void log(const char* tag, const char* message) {
+void log_err(const char* tag, const char* message) {
    time_t now;
    time(&now);
    FILE * fp=fopen(LOG_FILE_PATH,"w");

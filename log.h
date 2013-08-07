@@ -3,6 +3,6 @@
 
 #include "config.h"
 
-void log(const char* tag, const char* message);
+void log_err(const char* tag, const char* message);
 
 #endif /* log.h */
