@@ -487,7 +487,7 @@ int main(int argc, char **argv, char **envp)
 				log_err(error);
 			}
 			else{
-				sprintf(query, "DELETE FROM users WHERE key='%d'" , reader.rfid, hash);
+				sprintf(query, "DELETE FROM users WHERE key='%d'" , reader.rfid);
 				retval = sqlite3_prepare_v2(handle,query,-1,&stmt,0);
 				retval = sqlite3_step(stmt);
 
