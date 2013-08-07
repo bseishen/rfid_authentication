@@ -61,7 +61,7 @@ void* poll_wiegand(void *arg){
 	int readerCount=0;
 	int gpio_d0, gpio_d1, timePacket, rc;
 	char *buf[MAX_BUF];
-	char *error[255];
+	char error[255];
 	unsigned char charTemp;
 
 	gpio_d0 = gpio_fd_open(WIEGAND_D0_GPIO);
