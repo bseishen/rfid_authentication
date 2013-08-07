@@ -45,7 +45,7 @@ struct reader_t {
 
 struct reader_t reader;
 
-unsigned char clear_reader = 0;  //bit flag used to tell the wiegand routine to flush any temp data.
+unsigned char clear_reader = 0;  		//bit flag used to tell the wiegand routine to flush any temp data.
 
 
 
@@ -93,29 +93,15 @@ void* poll_wiegand(void *arg){
 			log_err(error);
 		}
 
-		if(clear_reader == 1){
-			reader.status = STATUS_NULL;
-			reader.rfid = 0;
-			reader.keys[0] = 0;
-			reader.keys[1] = 0;
-			reader.keys[2] = 0;
-			reader.keys[3] = 0;
-			reader.keys[4] = 0;
-			temp = 0;
-			readerCount = 0;
-			lastPacketType = 0;
-			keyCount = 0;
-			clear_reader = 0;
-		}
-
 		gettimeofday(&tvEnd, NULL);
-		timersub(&tvEnd, &reader.tvPacket, &tvDiff);
-		timePacket = (tvDiff.tv_sec) * 1000 + (tvDiff.tv_usec) / 1000 ;
 
 		//packet data over the wiegand is either 26bits for rfid read or 8 bits for a key press.
 		//if time from the last packet is under 5ms, treat the last packet as an rfid packet.
 		if(lastPacketType == 1){
+			timersub(&tvEnd, &reader.tvPacket, &tvDiff);
+			timePacket = (tvDiff.tv_sec) * 1000 + (tvDiff.tv_usec) / 1000 ;
 			lastPacketType = 0;
+
 			if(timePacket < MAX_WIEGAND_PACKET_LENGTH_MS){
 				//Delete all key presses. This is a rfid token being read.
 				keyCount = 0;
@@ -129,7 +115,26 @@ void* poll_wiegand(void *arg){
 				//Last packet was a key press.
 				temp = 0;
 				readerCount = 0;
+				//If an esc key was pressed, clear reader.
+				if(reader.keys[0] == 10 || reader.keys[1] == 10 || reader.keys[2] == 10 || reader.keys[3] == 10){
+					clear_reader == 1;
+				}
 			}
+		}
+
+		if(clear_reader == 1){
+			reader.status = STATUS_NULL;
+			reader.rfid = 0;
+			reader.keys[0] = 0;
+			reader.keys[1] = 0;
+			reader.keys[2] = 0;
+			reader.keys[3] = 0;
+			reader.keys[4] = 0;
+			temp = 0;
+			readerCount = 0;
+			lastPacketType = 0;
+			keyCount = 0;
+			clear_reader = 0;
 		}
 
 
@@ -227,6 +232,12 @@ void* poll_wiegand(void *arg){
 			reader.status |= STATUS_RFID_READY;
 			readerCount = 0;
 			temp = 0;
+			keyCount = 0;
+			reader.keys[0] = 0;
+			reader.keys[1] = 0;
+			reader.keys[2] = 0;
+			reader.keys[3] = 0;
+			reader.keys[4] = 0;
 		}
 
 		if(readerCount > 26){
@@ -269,13 +280,16 @@ int main(int argc, char **argv, char **envp)
 	char error[255];
 	sqlite3_stmt *stmt;
 	sqlite3 *handle;
-	struct timeval tvNow, tvDifference, tvAux;
+	struct timeval tvNow, tvDifference, tvAux, tvUnlock;
 	int timeMS;
 	int keyBuff;
 
 
 	//init ports
 	gpio_init();
+
+	//init tvUnlock, last time of door unlock.
+	gettimeofday(&tvUnlock, NULL);
 
 	//init DB
     retval = sqlite3_open(DB_PATH, &handle);
@@ -304,19 +318,19 @@ int main(int argc, char **argv, char **envp)
 
 		//get time passed since last wiegand packet
 		gettimeofday(&tvNow, NULL);
-		timersub(&tvNow, &reader.tvPacket, &tvDifference);
+		timersub(&tvNow, &tvUnlock, &tvDifference);
 		timeMS = (tvDifference.tv_sec) * 1000 + (tvDifference.tv_usec) / 1000 ;
 #ifdef DEBUG
 		printf("Timer: %d",timeMS);
 #endif
 		///Clear if timeout has exceeded threshold. Lock everything!
-		if(timeMS>TIMEOUT_DOORLOCK){
-			userVerified = 0;
-			clear_reader = 1;
+		if(timeMS>TIMEOUT_DOORLOCK && userVerified > 0){
 			lock_door();
 			led_off();
 			beep_off();
 			printf("DOOR LOCKING!!!!!!!!!!!!!!\n");
+			clear_reader = 1;
+			userVerified = 0;
 		}
 #ifdef DEBUG
 		//printf("READER STATUS: %d \n",reader.status);
@@ -412,6 +426,7 @@ int main(int argc, char **argv, char **envp)
 
 					retval = sqlite3_step(stmt);
 
+					gettimeofday(&tvUnlock, NULL);
 
 					unlock_door();
 					//led_on();
@@ -428,8 +443,8 @@ int main(int argc, char **argv, char **envp)
 			}
 		}
 
-		//delete user (using ESC key on keypad)
-		if(userVerified == 2 && reader.keys[4]==10){
+		//delete user (using 4 key on keypad)
+		if(userVerified == 2 && reader.keys[4]==4){
 			lastKey = reader.rfid;
 			sprintf(error,"Delete user mode entered by user ID: %d", reader.rfid);
 			log_err(error);
@@ -481,11 +496,11 @@ int main(int argc, char **argv, char **envp)
 			fflush(stdout);
 		}
 #ifdef ADD_FIRST_USER
-		reader.userVerified = 2;
+		userVerified = 2;
 		reader.keys[4]=11;
 #endif
-		//add new user (using ENT key on keypad)
-		if(userVerified == 2 && reader.keys[4]==11){
+		//add new user (using 3 key on keypad)
+		if(userVerified == 2 && reader.keys[4]==3){
 			lastKey = reader.rfid;
 
 			sprintf(error,"Add user mode entered by user %d",reader.rfid);
