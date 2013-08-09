@@ -1,5 +1,5 @@
 /*
-rfid.h
+config.h
 Copyright (c) 2012 Ben S. Eishen
 This library is free software; you can redistribute it and/or
 modify it under the terms of the GNU Lesser General Public
