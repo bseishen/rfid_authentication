@@ -96,11 +96,18 @@ void* poll_wiegand(void *arg){
 
 		gettimeofday(&tvEnd, NULL);
 
+                timersub(&tvEnd, &reader.tvPacket, &tvDiff);
+                timePacket = (tvDiff.tv_sec) * 1000 + (tvDiff.tv_usec) / 1000 ;
+
+		//clear everything if there wasnt a press after 10 seconds.
+		if(timePacket>10000)
+			clear_reader = 1;
+
 		//packet data over the wiegand is either 26bits for rfid read or 8 bits for a key press.
 		//if time from the last packet is under 5ms, treat the last packet as an rfid packet.
 		if(lastPacketType == 1){
-			timersub(&tvEnd, &reader.tvPacket, &tvDiff);
-			timePacket = (tvDiff.tv_sec) * 1000 + (tvDiff.tv_usec) / 1000 ;
+			//timersub(&tvEnd, &reader.tvPacket, &tvDiff);
+			//timePacket = (tvDiff.tv_sec) * 1000 + (tvDiff.tv_usec) / 1000 ;
 			lastPacketType = 0;
 
 			if(timePacket < MAX_WIEGAND_PACKET_LENGTH_MS){
@@ -119,6 +126,9 @@ void* poll_wiegand(void *arg){
 				//If an esc key was pressed, clear reader.
 				if(reader.keys[0] == 10 || reader.keys[1] == 10 || reader.keys[2] == 10 || reader.keys[3] == 10){
 					clear_reader = 1;
+#ifdef DEBUG
+					printf("ESC KEY WAS PRESSED\n");
+#endif
 				}
 			}
 		}
@@ -136,12 +146,20 @@ void* poll_wiegand(void *arg){
 			lastPacketType = 0;
 			keyCount = 0;
 			clear_reader = 0;
+#ifdef DEBUG
+			printf("FLUSHING RFID BUFFER\n");
+#endif
+
 		}
 
 		//this has been added to flush wiegand trash that shows up from EMI from the door latch.
 		if(clear_reader == 2){
+#ifdef DEBUG
+			printf("ONLY FLUSHING TEMP BUFFER\n");
+#endif
 			temp = 0;
 			readerCount = 0;
+			clear_reader = 0;
 		}
 
 
@@ -328,13 +346,14 @@ int main(int argc, char **argv, char **envp)
 		timersub(&tvNow, &tvUnlock, &tvDifference);
 		timeMS = (tvDifference.tv_sec) * 1000 + (tvDifference.tv_usec) / 1000 ;
 #ifdef DEBUG
-		printf("Timer: %d",timeMS);
+//		printf("Timer: %d",timeMS);
 #endif
 		///Clear if timeout has exceeded threshold. Lock everything!
 		if(timeMS>TIMEOUT_DOORLOCK && userVerified > 0){
 			lock_door();
 			led_off();
 			beep_off();
+			usleep(250000);
 			printf("DOOR LOCKING!!!!!!!!!!!!!!\n");
 			clear_reader = 1;
 			userVerified = 0;
@@ -436,7 +455,7 @@ int main(int argc, char **argv, char **envp)
 					gettimeofday(&tvUnlock, NULL);
 
 					unlock_door();
-					usleep(500);
+					usleep(100000);
 					clear_reader = 2;
 					//led_on();
 
