@@ -7,7 +7,7 @@
 void log_err(const char* message) {
    time_t now;
    time(&now);
-   FILE * fp=fopen(LOG_FILE_PATH,"w");
+   FILE * fp=fopen(LOG_FILE_PATH,"a+");
    fprintf(fp, "%s%s\n", ctime(&now), message);
    fclose(fp);
 
