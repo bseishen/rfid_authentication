@@ -23,8 +23,8 @@ Lesser General Public License for more details.
 #define STATUS_LED_GPIO    45 //pull to ground for Green, floating
 #define BUZZER_GPIO        44 //pull to ground to activate buzzer
 
-#define DB_PATH 		"/var/www/rfid.sqlite"
-#define LOG_FILE_PATH	"/var/www/rfid.log"
+#define DB_PATH 		"/data/rfid.sqlite"
+#define LOG_FILE_PATH		"/data/rfid.log"
 
 /*To add the first user to the database, comment the below line out
  * This will add the first rfid token and 4 digit key press to the database

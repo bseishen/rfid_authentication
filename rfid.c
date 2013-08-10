@@ -26,8 +26,8 @@ Lesser General Public License for more details.
 #include "log.h"
 #include "sqlite3.h"
 
-#define DEBUG_WIEGAND 1
-#define DEBUG	1
+//#define DEBUG_WIEGAND 1
+//#define DEBUG	1
 
 #define STATUS_NULL 		0x00
 #define STATUS_RFID_READY	0x01
