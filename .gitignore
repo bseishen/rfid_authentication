@@ -3,6 +3,7 @@
 rfid
 
 # Other #
+.cproject
 .project
 gpio_test/
 output.txt
