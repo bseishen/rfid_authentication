@@ -5,10 +5,13 @@
 #include <syslog.h>
 
 void log_err(const char* message) {
-   time_t now;
-   time(&now);
+	char s[1000];
+	time_t t = time(NULL);
+	struct tm * p = localtime(&t);
+    strftime(s, 1000, "%A, %B %d %Y", p);
+
    FILE * fp=fopen(LOG_FILE_PATH,"a+");
-   fprintf(fp, "%s%s\n", ctime(&now), message);
+   fprintf(fp, "%s|%s\n", s, message);
    fclose(fp);
 
    openlog (RFID_LOG, LOG_AUTH, LOG_NOTICE);
