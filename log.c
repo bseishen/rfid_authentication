@@ -8,7 +8,7 @@ void log_err(const char* message) {
 	char s[1000];
 	time_t t = time(NULL);
 	struct tm * p = localtime(&t);
-    strftime(s, 1000, "%A, %H:%M, %B %d %Y", p);
+    strftime(s, 1000, "%A %H:%M %B %d %Y", p);
 
    FILE * fp=fopen(LOG_FILE_PATH,"a+");
    fprintf(fp, "%s|%s\n", s, message);
