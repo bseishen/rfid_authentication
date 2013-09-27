@@ -394,7 +394,7 @@ int main(int argc, char **argv, char **envp)
 				        }
 				    }
 
-				sprintf(buffer, "%d", keyBuff);
+				sprintf(buffer, "%4d", keyBuff);
 				result = crypt(buffer, hash);
 				sprintf(query, "SELECT * from users WHERE key='%d'" , reader.rfid);
 				retval = sqlite3_exec(handle,query,0,0,0);
@@ -582,7 +582,7 @@ int main(int argc, char **argv, char **envp)
 
 				keyBuff = (reader.keys[0]*1000)+(reader.keys[1]*100)+(reader.keys[2]*10)+reader.keys[3];
 
-				sprintf(buffer, "%d", keyBuff);
+				sprintf(buffer, "%4d", keyBuff);
 				result = crypt(buffer, salt);
 
 #ifdef ADD_FIRST_USER
