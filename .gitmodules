@@ -1,0 +1,9 @@
+[submodule "Hardware/Libraries/EagleDerp"]
+	path = Hardware/Libraries/EagleDerp
+	url = https://github.com/dan9186/EagleDerp.git
+[submodule "Hardware/Libraries/SparkFun"]
+	path = Hardware/Libraries/SparkFun
+	url = https://github.com/sparkfun/SparkFun-Eagle-Libraries.git
+[submodule "Hardware/Libraries/Adafruit"]
+	path = Hardware/Libraries/Adafruit
+	url = https://github.com/adafruit/Adafruit-Eagle-Library.git
