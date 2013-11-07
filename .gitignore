@@ -1,5 +1,6 @@
 # Compiled Source #
 *.o
+*.swp
 rfid
 
 # Other #
@@ -8,3 +9,6 @@ rfid
 gpio_test/
 output.txt
 
+# Hardware Ignores
+Hardware/*.b#*
+Hardware/*.s#*
