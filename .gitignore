@@ -1,6 +1,7 @@
 # Compiled Source #
 *.o
 *.swp
+.DS_Store
 rfid
 
 # Other #
